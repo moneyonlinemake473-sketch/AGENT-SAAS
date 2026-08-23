@@ -1,0 +1,5 @@
+.env
+*.db
+bin/
+/tmp/wa-session-*.db
+.DS_Store
