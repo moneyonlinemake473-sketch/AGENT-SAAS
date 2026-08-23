@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: agent-saas
+    runtime: go
+    plan: free
+    buildCommand: go build -o bin/server ./cmd/server
+    startCommand: ./bin/server
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: ADMIN_API_KEY
+        sync: false   # à définir manuellement dans le dashboard Render (secret)
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GOOGLE_CREDENTIALS_JSON
+        sync: false
+      - key: FIRESTORE_PROJECT_ID
+        sync: false
+      - key: BASE_URL
+        value: https://agent-saas.onrender.com  # à ajuster après le premier déploiement
+      - key: GEMINI_INPUT_COST_PER_1K
+        value: "0.000075"
+      - key: GEMINI_OUTPUT_COST_PER_1K
+        value: "0.0003"
