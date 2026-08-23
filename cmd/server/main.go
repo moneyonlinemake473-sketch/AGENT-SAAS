@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"embed"
 	"encoding/json"
 	"html/template"
 	"log"
@@ -11,15 +10,13 @@ import (
 	"time"
 
 	"agent-saas/internal/ai"
+	"agent-saas/internal/assets"
 	"agent-saas/internal/config"
 	"agent-saas/internal/handlers"
 	"agent-saas/internal/sheets"
 	"agent-saas/internal/store"
 	"agent-saas/internal/whatsapp"
 )
-
-//go:embed ../../web/templates/*.html
-var templatesFS embed.FS
 
 func main() {
 	cfg := config.Load()
@@ -81,7 +78,7 @@ func main() {
 	}))
 
 	// --- Routes client (page HTML protégée par mot de passe + API pro) ---
-	tmpl := template.Must(template.ParseFS(templatesFS, "../../web/templates/client.html"))
+	tmpl := template.Must(template.ParseFS(assets.TemplatesFS, "client.html"))
 
 	mux.HandleFunc("/c/", func(w http.ResponseWriter, r *http.Request) {
 		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/c/"), "/")
