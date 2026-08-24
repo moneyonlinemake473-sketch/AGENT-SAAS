@@ -16,9 +16,13 @@ import (
 	"agent-saas/internal/sheets"
 	"agent-saas/internal/store"
 	"agent-saas/internal/whatsapp"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	_ = godotenv.Load() // charge .env s'il existe (local) ; sur Render les vraies variables sont déjà injectées
+
 	cfg := config.Load()
 	ctx := context.Background()
 
@@ -27,7 +31,9 @@ func main() {
 		log.Fatalf("firestore: %v", err)
 	}
 
-	sheetsMgr, err := sheets.New(ctx, cfg.GoogleCredentialsJSON)
+	log.Printf("classeur maître configuré: %q (longueur: %d)", cfg.GoogleMasterSpreadsheetID, len(cfg.GoogleMasterSpreadsheetID))
+
+	sheetsMgr, err := sheets.New(ctx, cfg.GoogleCredentialsJSON, cfg.GoogleMasterSpreadsheetID)
 	if err != nil {
 		log.Fatalf("google sheets: %v", err)
 	}

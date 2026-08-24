@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"agent-saas/internal/ai"
-	"agent-saas/internal/models"
 	"agent-saas/internal/sheets"
 	"agent-saas/internal/store"
 
@@ -26,19 +25,19 @@ import (
 
 // ClientHandle regroupe tout ce qu'il faut pour un client WhatsApp connecté
 type ClientHandle struct {
-	WAClient   *whatsmeow.Client
-	ClientID   string
-	dbPath     string
-	QRChan     chan string // les codes QR successifs sont poussés ici pour l'interface web
+	WAClient *whatsmeow.Client
+	ClientID string
+	dbPath   string
+	QRChan   chan string // les codes QR successifs sont poussés ici pour l'interface web
 }
 
 type Manager struct {
 	mu      sync.Mutex
 	clients map[string]*ClientHandle
 
-	fsStore    *store.Store
-	sheetsMgr  *sheets.Manager
-	geminiCli  *ai.Client
+	fsStore   *store.Store
+	sheetsMgr *sheets.Manager
+	geminiCli *ai.Client
 }
 
 func NewManager(fsStore *store.Store, sheetsMgr *sheets.Manager, geminiCli *ai.Client) *Manager {
@@ -195,8 +194,8 @@ func (m *Manager) handleEvent(ctx context.Context, clientID string, waClient *wh
 
 	// Historique récent depuis Google Sheets pour garder le contexte
 	var history []ai.HistoryTurn
-	if c.SpreadsheetID != "" {
-		rows, err := m.sheetsMgr.ReadRecentHistory(ctx, c.SpreadsheetID, 20)
+	if c.SheetTabName != "" {
+		rows, err := m.sheetsMgr.ReadRecentHistory(ctx, c.SheetTabName, 20)
 		if err == nil {
 			for _, r := range rows {
 				if len(r) < 3 {
@@ -220,10 +219,10 @@ func (m *Manager) handleEvent(ctx context.Context, clientID string, waClient *wh
 	_ = m.fsStore.RecordUsage(ctx, clientID, reply.PromptTokens+reply.CompletionTokens, reply.CostUSD)
 
 	// Log dans Google Sheets (message user + réponse assistant)
-	if c.SpreadsheetID != "" {
+	if c.SheetTabName != "" {
 		now := time.Now().Format(time.RFC3339)
-		_ = m.sheetsMgr.AppendMessage(ctx, c.SpreadsheetID, now, "user", userText)
-		_ = m.sheetsMgr.AppendMessage(ctx, c.SpreadsheetID, now, "assistant", reply.Text)
+		_ = m.sheetsMgr.AppendMessage(ctx, c.SheetTabName, now, "user", userText)
+		_ = m.sheetsMgr.AppendMessage(ctx, c.SheetTabName, now, "assistant", reply.Text)
 	}
 
 	m.sendWithAntiBan(ctx, waClient, msgEvt.Info.Chat, reply.Text)
@@ -232,7 +231,7 @@ func (m *Manager) handleEvent(ctx context.Context, clientID string, waClient *wh
 // sendWithAntiBan simule "en train d'écrire" puis attend un délai variable
 // avant d'envoyer, pour éviter un comportement trop robotique (risque de ban WhatsApp).
 func (m *Manager) sendWithAntiBan(ctx context.Context, waClient *whatsmeow.Client, chat types.JID, text string) {
-	_ = waClient.SendChatPresence(chat, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+	_ = waClient.SendChatPresence(ctx, chat, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 
 	// délai proportionnel à la longueur du message + aléa, entre ~2 et ~8 secondes
 	base := 2000 + len(text)*20
@@ -243,7 +242,7 @@ func (m *Manager) sendWithAntiBan(ctx context.Context, waClient *whatsmeow.Clien
 	}
 	time.Sleep(delay)
 
-	_ = waClient.SendChatPresence(chat, types.ChatPresencePaused, types.ChatPresenceMediaText)
+	_ = waClient.SendChatPresence(ctx, chat, types.ChatPresencePaused, types.ChatPresenceMediaText)
 
 	_, _ = waClient.SendMessage(ctx, chat, &waProto.Message{
 		Conversation: &text,

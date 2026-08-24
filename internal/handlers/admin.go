@@ -23,8 +23,6 @@ type AdminHandlers struct {
 	AdminKey  string
 }
 
-// Middleware simple par clé API (header X-Admin-Key). À remplacer par un vrai
-// système d'auth si tu ouvres cette route au-delà de toi-même.
 func (h *AdminHandlers) RequireAdmin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Admin-Key") != h.AdminKey {
@@ -43,13 +41,10 @@ type createClientRequest struct {
 
 type createClientResponse struct {
 	ClientID string `json:"client_id"`
-	Password string `json:"password"` // généré une seule fois, à transmettre au client
+	Password string `json:"password"`
 	URL      string `json:"url"`
 }
 
-// CreateClient génère un nouveau client : slug unique, mot de passe aléatoire,
-// feuille Google Sheets dédiée, document Firestore. Ne connecte pas encore
-// WhatsApp — ça se fait via /admin/clients/{id}/connect pour scanner le QR.
 func (h *AdminHandlers) CreateClient(w http.ResponseWriter, r *http.Request) {
 	var req createClientRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -67,20 +62,20 @@ func (h *AdminHandlers) CreateClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	spreadsheetID, err := h.SheetsMgr.CreateClientSheet(ctx, req.Name)
-	if err != nil {
-		http.Error(w, "erreur création feuille google sheets: "+err.Error(), http.StatusInternalServerError)
+	tabName := id
+	if err := h.SheetsMgr.CreateClientTab(ctx, tabName); err != nil {
+		http.Error(w, "erreur création onglet google sheets: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	client := &models.Client{
-		ID:            id,
-		Name:          req.Name,
-		PasswordHash:  string(hash),
-		SystemPrompt:  req.SystemPrompt,
-		IsActive:      true,
-		TokenLimit:    req.TokenLimit,
-		SpreadsheetID: spreadsheetID,
+		ID:           id,
+		Name:         req.Name,
+		PasswordHash: string(hash),
+		SystemPrompt: req.SystemPrompt,
+		IsActive:     true,
+		TokenLimit:   req.TokenLimit,
+		SheetTabName: tabName,
 	}
 	if err := h.Store.CreateClient(ctx, client); err != nil {
 		http.Error(w, "erreur création client: "+err.Error(), http.StatusInternalServerError)
@@ -131,8 +126,6 @@ func (h *AdminHandlers) ListClients(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, clients)
 }
 
-// Connect démarre (ou redémarre) la session WhatsApp d'un client. Le QR code
-// est renvoyé en flux (SSE simplifié ici en polling simple, voir client.go).
 func (h *AdminHandlers) Connect(w http.ResponseWriter, r *http.Request, clientID string) {
 	qrOut := make(chan string, 1)
 	go func() {

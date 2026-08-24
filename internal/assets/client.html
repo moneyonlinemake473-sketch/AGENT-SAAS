@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Espace client</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 20px; background: #f7f7f8; }
+  .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 16px; }
+  input, textarea, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-size: 15px; }
+  button { background: #111; color: white; border: none; cursor: pointer; margin-top: 12px; }
+  .switch { display: flex; align-items: center; justify-content: space-between; }
+  #app { display: none; }
+  .error { color: #c0392b; font-size: 14px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div class="card" id="login-card">
+  <h2>Connexion</h2>
+  <p>Entrez votre mot de passe pour accéder à votre espace.</p>
+  <input type="password" id="password" placeholder="Mot de passe">
+  <button onclick="login()">Se connecter</button>
+  <div class="error" id="login-error"></div>
+</div>
+
+<div id="app">
+  <div class="card switch">
+    <span>Bot activé</span>
+    <label>
+      <input type="checkbox" id="active-toggle" onchange="toggleBot()" style="width:auto;">
+    </label>
+  </div>
+
+  <div class="card">
+    <h3>Contacts à ne pas traiter</h3>
+    <p>Un numéro par ligne, format international sans le "+".</p>
+    <textarea id="blocklist" rows="5" placeholder="22997xxxxxx"></textarea>
+    <button onclick="saveBlocklist()">Enregistrer</button>
+  </div>
+</div>
+
+<script>
+const clientID = "{{.ClientID}}";
+
+async function login() {
+  const password = document.getElementById('password').value;
+  const res = await fetch(`/c/${clientID}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password })
+  });
+  if (res.ok) {
+    document.getElementById('login-card').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+  } else {
+    document.getElementById('login-error').innerText = "Mot de passe incorrect.";
+  }
+}
+
+async function toggleBot() {
+  const active = document.getElementById('active-toggle').checked;
+  await fetch(`/c/${clientID}/toggle`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active })
+  });
+}
+
+async function saveBlocklist() {
+  const raw = document.getElementById('blocklist').value;
+  const contacts = raw.split('\n').map(s => s.trim()).filter(Boolean);
+  await fetch(`/c/${clientID}/blocklist`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contacts })
+  });
+}
+</script>
+
+</body>
+</html>
